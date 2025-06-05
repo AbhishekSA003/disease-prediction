@@ -1,0 +1,112 @@
+import streamlit as st
+import pickle
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+
+# Load trained models
+models = {
+    'Random Forest': pickle.load(open('Random_Forest_model.pkl', 'rb')),
+    'Logistic Regression': pickle.load(open('model_logreg.pkl', 'rb')),
+    'Support Vector Machine': pickle.load(open('model_svm.pkl', 'rb')),
+}
+
+# Load data
+df = pd.read_csv('symptom_disease_data.csv')
+X = df.drop('disease', axis=1)
+y = df['disease']
+
+# Precaution and medicine dictionary (you can expand this)
+disease_info = {
+    'Flu': {
+        'Precaution': 'Rest, drink fluids, and avoid contact with others.',
+        'Medicine': 'Paracetamol, Antiviral drugs'
+    },
+    'Cold': {
+        'Precaution': 'Stay warm, drink fluids.',
+        'Medicine': 'Antihistamines, Decongestants'
+    },
+    'Malaria': {
+        'Precaution': 'Use mosquito nets, avoid stagnant water.',
+        'Medicine': 'Chloroquine, Artemisinin'
+    },
+    'Typhoid': {
+        'Precaution': 'Drink clean water, wash hands regularly.',
+        'Medicine': 'Ciprofloxacin, Azithromycin'
+    }
+}
+
+# Page title
+st.title("🩺 Disease Prediction with Symptom Tracker and Algorithm Comparison")
+
+st.sidebar.header("Enter Your Symptoms")
+
+# Symptom input
+fever = st.sidebar.radio("Fever", ("Yes", "No"))
+headache = st.sidebar.radio("Headache", ("Yes", "No"))
+fatigue = st.sidebar.radio("Fatigue", ("Yes", "No"))
+cough = st.sidebar.radio("Cough", ("Yes", "No"))
+nausea = st.sidebar.radio("Nausea", ("Yes", "No"))
+
+symptom_input = np.array([[int(fever == 'Yes'), int(headache == 'Yes'),
+                           int(fatigue == 'Yes'), int(cough == 'Yes'),
+                           int(nausea == 'Yes')]])
+
+# Prediction Button
+if st.button("🔍 Predict and Compare"):
+    st.subheader("🔎 Predictions from Multiple Models")
+    predictions = {}
+    accuracies = {}
+    reports = {}
+    conf_matrices = {}
+
+    # Predict and evaluate for each model
+    for name, model in models.items():
+        pred = model.predict(symptom_input)[0]
+        predictions[name] = pred
+
+        acc = accuracy_score(y, model.predict(X))
+        accuracies[name] = acc
+
+        cm = confusion_matrix(y, model.predict(X))
+        conf_matrices[name] = cm
+
+        reports[name] = classification_report(y, model.predict(X), output_dict=True)
+
+        st.markdown(f"### {name}")
+        st.write(f"🧾 **Predicted Disease:** `{pred}`")
+        st.write(f"✅ **Model Accuracy:** `{acc * 100:.2f}%`")
+
+        # Confusion Matrix Plot
+        fig, ax = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=model.classes_, yticklabels=model.classes_, ax=ax)
+        plt.title(f"Confusion Matrix - {name}")
+        st.pyplot(fig)
+
+    # Comparison Chart
+    st.subheader("📊 Accuracy Comparison")
+    st.bar_chart(pd.Series(accuracies))
+
+    # Show predicted disease from best model
+    best_model_name = max(accuracies, key=accuracies.get)
+    best_disease = predictions[best_model_name]
+    st.success(f"💡 Final Disease Prediction (Best Model - {best_model_name}): `{best_disease}`")
+
+    # Show precaution and medicine
+    if best_disease in disease_info:
+        st.markdown("## 🛡️ Recommended Precaution & Medicine")
+        st.write(f"🛑 **Precaution:** {disease_info[best_disease]['Precaution']}")
+        st.write(f"💊 **Medicine:** {disease_info[best_disease]['Medicine']}")
+    else:
+        st.warning("⚠️ No information available for this disease.")
+
+
+
+
+
